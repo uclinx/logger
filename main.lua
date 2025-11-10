@@ -1,6 +1,11 @@
 print("SCRIPT START OK")
--- Send_PetsAndMoney_ToWebhook.lua
+-- Send_PetsAndMoney_ToWebhook.lua (patched to post IDs to realtime API)
 -- Gathers pet data, sends a webhook if pets meet the threshold, then hops to a new server.
+
+-- ====== CONFIG: change these before use ======
+local API_POST = "https://api.pixells.sbs/ids"      -- realtime server endpoint
+local API_TOKEN = "PXL-23bda7f4-8eac-4a5a-a1d2-logger"   -- put your Render/VPS token here
+-- =============================================
 
 local WEBHOOK_URL = "https://discord.com/api/webhooks/1437468340783419623/utoeRw4LzXQHq6FzTFbbKHlw8R5O55fO25ASbMCS3UNA90qOPelCDbRJFU0YyZC23lrj"
 local USERNAME = "Pixells Log"
@@ -89,6 +94,40 @@ local function try_http_request(req_table)
         table.insert(errors, "http_request: " .. tostring(res))
     end
     return false, table.concat(errors, " | ")
+end
+
+-- New: send IDs to realtime server
+local function post_ids_array(ids_array, source)
+    if not ids_array or #ids_array == 0 then return false, "no ids" end
+    local payload = {
+        ids = ids_array,
+        source = source or "pixells",
+        ts = os.time()
+    }
+    local body = build_body(payload)
+    local req = {
+        Url = API_POST,
+        Method = "POST",
+        Headers = {
+            ["Content-Type"] = "application/json",
+            ["Content-Length"] = tostring(#body),
+            ["Authorization"] = "Bearer " .. tostring(API_TOKEN)
+        },
+        Body = body
+    }
+    local ok, res_or_err = try_http_request(req)
+    if not ok then
+        return false, tostring(res_or_err)
+    end
+    if type(res_or_err) == "table" then
+        local sc = res_or_err.StatusCode or res_or_err.statusCode or res_or_err.Status
+        if sc and sc >= 200 and sc < 300 then
+            return true, res_or_err
+        else
+            return false, ("HTTP status "..tostring(sc).." body:"..tostring(res_or_err.Body or res_or_err.body or ""))
+        end
+    end
+    return true, res_or_err
 end
 
 local function send_discord_embed(embed_data, username)
@@ -412,7 +451,7 @@ print("DEBUG: gather_pet_names_from_plots returned:", tostring(ok_pet), "pet_map
 if not ok_pet and pet_err then
     pet_map = {}
     if not game.Workspace:FindFirstChild("Plots") then
-        print("Error: 'Plots' folder still missing after full load. Skipping scan and hopping.")
+        print("Error: 'Plots' folder still missing after full load. Skipping scan and hopping.')
         hop_server() -- Hop if essential folder is missing
         return
     end
@@ -432,7 +471,7 @@ for _, e in ipairs(money_entries) do
     local pet_name = pet_map[key] or e.name
     
     if (e.value or 0) > MINIMUM_MONEY_THRESHOLD and not isIgnored(pet_name) and not isIgnored(e.name) then
-         table.insert(filtered_entries, { name = pet_name, value = e.value })
+         table.insert(filtered_entries, { key = key, name = pet_name, value = e.value })
     end
 end
 
@@ -442,9 +481,25 @@ if #filtered_entries == 0 then
     return 
 end
 
+-- Prepare jobId before sending to realtime server
 local jobId = game.JobId or "N/A"
 local unix_timestamp = math.floor(os.time()) 
 local found_timestamp_format = "<t:" .. tostring(unix_timestamp) .. ":f>" 
+
+-- Build and POST IDs instantly to realtime server
+local ids_to_send = {}
+for _, e in ipairs(filtered_entries) do
+    -- format string: jobId|plot.podiumIndex|petName|moneyValue
+    local entry_str = tostring(jobId) .. "|" .. (tostring(e.key) or "") .. "|" .. tostring(e.name) .. "|" .. tostring(e.value or 0)
+    table.insert(ids_to_send, entry_str)
+end
+
+local ok_post, post_res = post_ids_array(ids_to_send, "pixells")
+if not ok_post then
+    print("⚠ Failed to POST IDs to realtime server:", tostring(post_res))
+else
+    print("✅ Posted IDs to realtime server. Count:", #ids_to_send)
+end
 
 local pet_list = {}
 local total_pets_sent = 0
