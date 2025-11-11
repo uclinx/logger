@@ -1,17 +1,12 @@
--- Send_PetsAndMoney_ToWebhook.lua
--- Gathers pet data, sends a webhook if pets meet the threshold, then hops to a new server.
 
--- ====== API CONFIG ======
-local API_POST = "https://api.pixells.sbs/ids" -- API endpoint for sending IDs
-local API_TOKEN = "PXL-23bda7f4-8eac-4a5a-a1d2-logger" -- Your API token
--- ========================
+local API_POST = "https://api.pixells.sbs/ids" 
+local API_TOKEN = "PXL-23bda7f4-8eac-4a5a-a1d2-logger" 
 
 local WEBHOOK_URL = "https://discord.com/api/webhooks/1437810721252704307/f-RpaCE0msTrEe4ZpesAkvrJMo-7ivJ_AiNlfjdhyz8Y8FUkfpcQxY-p-vJnZ9901RtL"
 local USERNAME = "Pixells Log"
 local EMBED_COLOR = 0xFFFFFF 
 local MINIMUM_MONEY_THRESHOLD = 1
 
--- === Name Filtering ===
 local ignoreList = {
     "FriendPanel",
     "Model",
@@ -35,7 +30,6 @@ local function isIgnored(name)
     return false
 end
 
--- === Webhook Helper Functions ===
 local function escape_json_str(s)
     s = tostring(s or "")
     s = s:gsub("\\","\\\\"):gsub('"','\\"'):gsub("\n","\\n"):gsub("\r","\\r"):gsub("\t","\\t")
@@ -72,25 +66,21 @@ end
 
 local function try_http_request(req_table)
     local errors = {}
-    -- Try syn.request first (often preferred in exploit contexts)
     if type(syn) == "table" and type(syn.request) == "function" then
         local ok, res = pcall(function() return syn.request(req_table) end)
         if ok and res then return true, res end
         table.insert(errors, "syn.request")
     end
-    -- Try http.request (common fallback/legacy)
     if type(http) == "table" and type(http.request) == "function" then
         local ok, res = pcall(function() return http.request(req_table) end)
         if ok and res then return true, res end
         table.insert(errors, "http.request")
     end
-    -- Try request (another common variation)
     if type(request) == "function" then
         local ok, res = pcall(function() return request(req_table) end)
         if ok and res then return true, res end
         table.insert(errors, "request")
     end
-    -- Try http_request (yet another variation)
     if type(http_request) == "function" then
         local ok, res = pcall(function() return http_request(req_table) end)
         if ok and res then return true, res end
@@ -99,7 +89,6 @@ local function try_http_request(req_table)
     return false, "No supported HTTP client found or request failed. Tried: " .. table.concat(errors, ", ")
 end
 
--- === NEW: Send IDs to API ===
 local function post_ids_array(ids_array, source)
     if not ids_array or #ids_array == 0 then 
         return false, "no ids to send" 
@@ -117,7 +106,6 @@ local function post_ids_array(ids_array, source)
         Method = "POST",
         Headers = {
             ["Content-Type"] = "application/json",
-            -- NOTE: Content-Length is often automatically handled, but is included for robustness.
             ["Content-Length"] = tostring(#body), 
             ["Authorization"] = "Bearer " .. tostring(API_TOKEN)
         },
@@ -131,7 +119,6 @@ local function post_ids_array(ids_array, source)
     end
     
     if type(res_or_err) == "table" then
-        -- FIX: Use a more robust check for StatusCode and Body casing.
         local status_code = res_or_err.StatusCode or res_or_err.statusCode or 0
         local res_body = res_or_err.Body or res_or_err.body or "no body provided"
         
@@ -142,8 +129,7 @@ local function post_ids_array(ids_array, source)
         end
     end
     
-    return true, res_or_err -- Return true if it somehow succeeded without a table response (rare)
-end
+    return true, res_or_err 
 
 local function send_discord_embed(embed_data, username)
     local payload = {
@@ -168,7 +154,6 @@ local function send_discord_embed(embed_data, username)
     return true
 end
 
--- === Utility Functions (No changes needed here, they are fine) ===
 local function format_number(n)
     if n >= 1e12 then
         return string.format("%.1fT/s", n / 1e12)
@@ -437,7 +422,6 @@ if not game:IsLoaded() then
     end
 end
 
--- 2. Add a small buffer wait to ensure GUIs/dynamic elements are visible
 wait(2) 
 print("Game fully loaded. Starting server scan.")
 --------------------------------------------
@@ -445,7 +429,6 @@ print("Game fully loaded. Starting server scan.")
 local pet_lines, pet_map, pet_err = gather_pet_names_from_plots()
 if not pet_lines then
     pet_map = {}
-    -- Added a final check here just in case Plots is still missing after wait
     if not game.Workspace:FindFirstChild("Plots") then
         print("Error: 'Plots' folder still missing after full load. Skipping scan and hopping.")
         hop_server()
@@ -471,18 +454,14 @@ if #filtered_entries == 0 then
     return 
 end
 
--- === NEW: Send data to API ===
 local jobId = game.JobId or "N/A"
 local ids_to_send = {}
 
 for _, e in ipairs(filtered_entries) do
-    -- Format: jobId|plot.podiumIndex|petName|moneyValue
-    -- Ensure moneyValue is a string representation for consistent parsing on the server
     local entry_str = tostring(jobId) .. "|" .. tostring(e.key) .. "|" .. tostring(e.name) .. "|" .. tostring(e.value or 0)
     table.insert(ids_to_send, entry_str)
 end
 
--- Send to API immediately
 print("📡 Sending " .. #ids_to_send .. " entries to API...")
 local api_success, api_result = post_ids_array(ids_to_send, "pixells")
 
@@ -492,7 +471,6 @@ else
     print("❌ Failed to send data to API: " .. tostring(api_result))
 end
 
--- Continue with Discord webhook as before
 local unix_timestamp = math.floor(os.time()) 
 local found_timestamp_format = "<t:" .. tostring(unix_timestamp) .. ":f>" 
 
@@ -539,7 +517,6 @@ local embed_data = {
         },
         {
             name = "📡 API Status",
-            -- Display only the success/fail, the error message is too long for an inline field
             value = api_success and "✅ Success" or "❌ Failed (Check logs)", 
             inline = true
         }
