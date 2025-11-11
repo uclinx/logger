@@ -1,4 +1,3 @@
-
 local API_POST = "https://api.pixells.sbs/ids" 
 local API_TOKEN = "PXL-23bda7f4-8eac-4a5a-a1d2-logger" 
 
@@ -130,6 +129,7 @@ local function post_ids_array(ids_array, source)
     end
     
     return true, res_or_err 
+end  -- <<-- سطر الإغلاق المفقود اضيفته هنا
 
 local function send_discord_embed(embed_data, username)
     local payload = {
