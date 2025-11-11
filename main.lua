@@ -258,7 +258,6 @@ local function extract_name_from_podium(podium)
 end
 
 local function gather_pet_names_from_plots()
-    -- بترجع جدول pet_map حتى لو Plots مش موجود (هترجع جدول فاضي)
     local root = game.Workspace:FindFirstChild("Plots")
     if not root then
         return {}
@@ -290,85 +289,79 @@ local function scan_money_entries_by_plot_podium()
 
     for _, inst in ipairs(desc) do
         local okPath, full = pcall(function() return inst:GetFullName() end)
-        if not okPath or type(full) ~= "string" then
-        else
-            if not full:lower():find(includeOnlySubstring:lower(), 1, true) then
-            else
-                local txt = try_get_text(inst)
-                if not txt then
-                else
-                    local ltxt = txt:lower()
-                    if not (ltxt:find("/s",1,true) or ltxt:find("per s",1,true) or ltxt:find("/sec",1,true)) then
-                    else
-                        local num = parse_money_per_sec(txt) or 0
-                        local plotId = full:match("Workspace%.Plots%.([^%.]+)")
-                        local podiumIndex = full:match("AnimalPodiums%.(%d+)")
-                        if not plotId then plotId = full:match("Plots%.([^%.]+)") end
+        if okPath and type(full) == "string" and full:lower():find(includeOnlySubstring:lower(), 1, true) then
+            local txt = try_get_text(inst)
+            if txt then
+                local ltxt = txt:lower()
+                if ltxt:find("/s",1,true) or ltxt:find("per s",1,true) or ltxt:find("/sec",1,true) then
+                    local num = parse_money_per_sec(txt) or 0
+                    local plotId = full:match("Workspace%.Plots%.([^%.]+)")
+                    local podiumIndex = full:match("AnimalPodiums%.(%d+)")
+                    if not plotId then plotId = full:match("Plots%.([^%.]+)") end
 
-                        local podiumInstance = nil
-                        if plotId and podiumIndex then
-                            local plots = game.Workspace:FindFirstChild("Plots")
-                            if plots then
-                                local plot = plots:FindFirstChild(plotId)
-                                if plot then
-                                    local ap = plot:FindFirstChild("AnimalPodiums")
-                                    if ap then
-                                        podiumInstance = ap:FindFirstChild(tostring(podiumIndex))
-                                        if not podiumInstance then
-                                            local idx = tonumber(podiumIndex)
-                                            if idx and idx >= 1 then
-                                                local kids = ap:GetChildren()
-                                                if idx <= #kids then podiumInstance = kids[idx] end
-                                            end
+                    local podiumInstance = nil
+                    if plotId and podiumIndex then
+                        local plots = game.Workspace:FindFirstChild("Plots")
+                        if plots then
+                            local plot = plots:FindFirstChild(plotId)
+                            if plot then
+                                local ap = plot:FindFirstChild("AnimalPodiums")
+                                if ap then
+                                    podiumInstance = ap:FindFirstChild(tostring(podiumIndex))
+                                    if not podiumInstance then
+                                        local idx = tonumber(podiumIndex)
+                                        if idx and idx >= 1 then
+                                            local kids = ap:GetChildren()
+                                            if idx <= #kids then podiumInstance = kids[idx] end
                                         end
                                     end
                                 end
                             end
                         end
+                    end
 
-                        local model = find_nearest_model(inst)
-                        local modelName = model and model.Name or nil
-                        local finalName = nil
+                    local model = find_nearest_model(inst)
+                    local modelName = model and model.Name or nil
+                    local finalName = nil
 
-                        if podiumInstance then
-                            local byPod = extract_name_from_podium(podiumInstance)
-                            if byPod and byPod:match("%S") and not isIgnored(byPod) then
-                                finalName = byPod
-                            end
+                    if podiumInstance then
+                        local byPod = extract_name_from_podium(podiumInstance)
+                        if byPod and byPod:match("%S") and not isIgnored(byPod) then
+                            finalName = byPod
                         end
+                    end
 
-                        if (not finalName or finalName == "") then
-                            if model then
-                                local sv = model:FindFirstChild("PetName", true) or model:FindFirstChild("Name", true) or model:FindFirstChild("DisplayName", true)
+                    if (not finalName or finalName == "") then
+                        if model then
+                            local sv = model:FindFirstChild("PetName", true) or model:FindFirstChild("Name", true) or model:FindFirstChild("DisplayName", true)
 
-                                local name_val = nil
-                                if sv then
-                                    if sv:IsA("StringValue") or sv:IsA("NumberValue") then
-                                        name_val = tostring(sv.Value)
-                                    elseif sv:IsA("TextLabel") or sv:IsA("TextBox") then
-                                        name_val = sv.Text
-                                    end
-                                end
-
-                                if name_val and name_val:match("%S") and not is_uuid_like_short(name_val) and not isIgnored(name_val) then
-                                    finalName = name_val
+                            local name_val = nil
+                            if sv then
+                                if sv:IsA("StringValue") or sv:IsA("NumberValue") then
+                                    name_val = tostring(sv.Value)
+                                elseif sv:IsA("TextLabel") or sv:IsA("TextBox") then
+                                    name_val = sv.Text
                                 end
                             end
 
-                            if not finalName and modelName and modelName ~= "Base" and modelName ~= "Model" and not is_uuid_like_short(modelName) and not isIgnored(modelName) then
-                                finalName = modelName
+                            if name_val and name_val:match("%S") and not is_uuid_like_short(name_val) and not isIgnored(name_val) then
+                                finalName = name_val
                             end
                         end
 
-                        if not finalName or finalName == "" or is_uuid_like_short(finalName) or isIgnored(finalName) then
-                            if plotId and podiumIndex then finalName = "Podium"..tostring(podiumIndex) else finalName = "(unknown)" end
+                        if not finalName and modelName and modelName ~= "Base" and modelName ~= "Model" and not is_uuid_like_short(modelName) and not isIgnored(modelName) then
+                            finalName = modelName
                         end
+                    end
 
-                        local key = tostring(plotId or "(unknown)") .. "." .. tostring(podiumIndex or "?")
-                        local existing = results[key]
-                        if (not existing) or ((existing.value or 0) < num) then
-                            results[key] = { name = finalName, value = num, raw = txt, full = full }
-                        end
+                    if not finalName or finalName == "" or is_uuid_like_short(finalName) or isIgnored(finalName) then
+                        if plotId and podiumIndex then finalName = "Podium"..tostring(podiumIndex) else finalName = "(unknown)" end
+                    end
+
+                    local key = tostring(plotId or "(unknown)") .. "." .. tostring(podiumIndex or "?")
+                    local existing = results[key]
+                    if (not existing) or ((existing.value or 0) < num) then
+                        results[key] = { name = finalName, value = num, raw = txt, full = full }
                     end
                 end
             end
@@ -387,14 +380,11 @@ local function hop_server()
     local TS = game:GetService("TeleportService")
     local placeId = game.PlaceId
 
-    print("Attempting server hop to new instance of PlaceID:", placeId)
-
     local success, error_msg = pcall(function()
         TS:Teleport(placeId)
     end)
 
     if not success then
-        print("Teleport failed or is unsupported by executor:", error_msg or "Unknown error")
         if type(teleport) == "function" then
             pcall(function()
                 teleport(placeId)
@@ -403,16 +393,12 @@ local function hop_server()
     end
 end
 
--- === MAIN EXECUTION BLOCK (scans فور دخول الـ instance) ===
+-- === MAIN EXECUTION BLOCK (Immediate, no waits, no load checks) ===
 
-print("Starting immediate scan (no waits)...")
-
--- احصل على pet_map فوراً
 local pet_map = gather_pet_names_from_plots()
 if not pet_map or type(pet_map) ~= "table" then
     pet_map = {}
     if not game.Workspace:FindFirstChild("Plots") then
-        print("Error: 'Plots' folder missing. Skipping scan and hopping.")
         hop_server()
         return
     end
@@ -431,7 +417,6 @@ for _, e in ipairs(money_entries) do
 end
 
 if #filtered_entries == 0 then
-    print("No pets found above the $" .. tostring(MINIMUM_MONEY_THRESHOLD) .. "/s threshold. Webhook skipped.")
     hop_server()
     return
 end
@@ -444,14 +429,7 @@ for _, e in ipairs(filtered_entries) do
     table.insert(ids_to_send, entry_str)
 end
 
-print("📡 Sending " .. #ids_to_send .. " entries to API...")
 local api_success, api_result = post_ids_array(ids_to_send, "pixells")
-
-if api_success then
-    print("✅ Successfully sent data to API. Job ID: " .. jobId)
-else
-    print("❌ Failed to send data to API: " .. tostring(api_result))
-end
 
 local unix_timestamp = math.floor(os.time())
 local found_timestamp_format = "<t:" .. tostring(unix_timestamp) .. ":f>"
@@ -462,7 +440,6 @@ local max_pets_in_description = 15
 
 for i, e in ipairs(filtered_entries) do
     if total_pets_sent >= max_pets_in_description then break end
-
     local formatted_money = format_number(e.value or 0)
     table.insert(pet_list, string.format("%d. **%s** | $%s", i, tostring(e.name), formatted_money))
     total_pets_sent = total_pets_sent + 1
@@ -483,7 +460,7 @@ local embed_data = {
     color = EMBED_COLOR,
     fields = {
         {
-            name = "🔑 **Job ID**",
+            name = "🔑 Job ID",
             value = "```ini\n" .. tostring(jobId) .. "\n```",
             inline = false
         },
@@ -499,7 +476,7 @@ local embed_data = {
         },
         {
             name = "📡 API Status",
-            value = api_success and "✅ Success" or "❌ Failed (Check logs)",
+            value = api_success and "✅ Success" or ("❌ Failed - " .. tostring(api_result)),
             inline = true
         }
     },
@@ -509,12 +486,6 @@ local embed_data = {
     }
 }
 
-local ok, err = send_discord_embed(embed_data, USERNAME)
-
-if not ok then
-    print("Failed to send webhook:", err)
-else
-    print("Webhook sent successfully with Job ID and filtered Pet Data. Filtered entries:", #filtered_entries)
-end
+send_discord_embed(embed_data, USERNAME)
 
 hop_server()
